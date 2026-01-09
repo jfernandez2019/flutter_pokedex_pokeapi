@@ -33,39 +33,39 @@ API pública utilizada para obtener información de Pokémon.
 
 El proyecto sigue una **arquitectura por capas**, inspirada en Clean Architecture, adaptada a un contexto educativo.
 
+```
 lib/
-├── core/
-│ ├── constants/ # Configuraciones globales (URLs, etc.)
-│ └── network/ # Cliente HTTP (Dio)
-│
-├── features/
-│ └── pokemon/
-│ ├── data/ # Modelos, API, repositorios
-│ ├── domain/ # Contratos / abstracciones
-│ └── presentation/
-│ ├── providers/ # Riverpod (estado y dependencias)
-│ ├── screens/ # Pantallas
-│ └── widgets/ # Widgets reutilizables
-
-
+ ├── core/
+ │    ├── constants/      # Configuraciones globales (URLs, etc.)
+ │    └── network/        # Cliente HTTP (Dio)
+ │
+ ├── features/
+ │    └── pokemon/
+ │         ├── data/      # Modelos, API, repositorios
+ │         ├── domain/    # Contratos / abstracciones
+ │         └── presentation/
+ │              ├── providers/  # Riverpod (estado y dependencias)
+ │              ├── screens/    # Pantallas
+ │              └── widgets/    # Widgets reutilizables
+```
 
 ### ¿Por qué esta arquitectura?
 - La UI no conoce detalles de red
-- La lógica no depende de widgets
+- La lógica de negocio no depende de widgets
 - El código escala sin volverse caótico
 - Facilita testing y mantenimiento
 
 ---
 
-## 📡 Dio – Capa de red (HTTP)
+## 📡 Capa de red – Dio (HTTP Client)
 
-`dio` es el cliente HTTP utilizado para comunicarse con la API.
+`dio` es el cliente HTTP utilizado para comunicarse con la PokeAPI.
 
-### Responsabilidad de Dio en el proyecto
-- Realizar requests HTTP
+### Rol de Dio en el proyecto
+- Ejecutar requests HTTP
 - Manejar parámetros, headers y timeouts
 - Centralizar configuración de red
-- Evitar lógica de red en la UI
+- Evitar lógica de red dentro de la UI
 
 ### Ejemplo de uso
 ```dart
@@ -76,8 +76,26 @@ final response = await dio.get(
     'offset': 0,
   },
 );
+```
 
+### Regla clave
+> Dio **nunca** se usa directamente en widgets.  
+> Siempre se encapsula en una clase de API o repositorio.
 
+---
+
+## 🧊 Modelado de datos – Freezed + JSON Serializable
+
+Se utilizan para transformar respuestas JSON en **objetos Dart seguros, tipados e inmutables**.
+
+### Rol de Freezed en el proyecto
+- Definir modelos de datos
+- Convertir JSON → Dart automáticamente
+- Evitar errores de tipo y null
+- Reducir código repetitivo (boilerplate)
+
+### Ejemplo de modelo
+```dart
 @freezed
 class PokemonListItem with _$PokemonListItem {
   const factory PokemonListItem({
@@ -88,40 +106,76 @@ class PokemonListItem with _$PokemonListItem {
   factory PokemonListItem.fromJson(Map<String, dynamic> json) =>
       _$PokemonListItemFromJson(json);
 }
+```
 
-
+### Uso del modelo
+```dart
 final pokemon = PokemonListItem.fromJson(json);
 print(pokemon.name);
+```
 
-🛠️ Generación de código
+### Regla mental
+> Si una API devuelve JSON → usar Freezed + json_serializable
+
+---
+
+### 🛠️ Generación de código
 
 Cada vez que se crea o modifica un modelo:
 
+```bash
 dart run build_runner build --delete-conflicting-outputs
+```
 
+Esto genera automáticamente:
+- `*.freezed.dart`
+- `*.g.dart`
 
-Esto genera automáticamente los archivos:
+---
 
-*.freezed.dart
+## 🔁 Manejo de estado e inyección de dependencias – Riverpod
 
-*.g.dart
+`flutter_riverpod` se utiliza como **gestor de estado** y **sistema de inyección de dependencias**.
+
+### Rol de Riverpod en el proyecto
+- Proveer dependencias (Dio, APIs)
+- Manejar estado asincrónico
+- Separar lógica de negocio de la UI
+- Controlar el ciclo de vida de los datos
+
+---
 
 ### Provider de dependencia
+```dart
 final dioProvider = Provider<Dio>((ref) => createDio());
+```
 
-Provider asincrónico (estado)
+Riverpod reemplaza la necesidad de crear singletons manuales.
+
+---
+
+### Provider asincrónico (estado)
+```dart
 final pokemonProvider = FutureProvider<List<PokemonListItem>>((ref) async {
   final api = ref.watch(pokemonApiProvider);
   return api.fetchPokemon();
 });
+```
 
+Riverpod gestiona automáticamente:
+- loading
+- error
+- data
 
-🎨 UI – Uso del estado en widgets
+---
 
-La UI no contiene lógica de negocio.
+## 🎨 UI – Consumo de estado
+
+La UI **no contiene lógica de negocio**.  
 Solo observa el estado y renderiza.
 
-Ejemplo de uso en pantalla
+### Ejemplo de uso en una pantalla
+```dart
 final pokemonAsync = ref.watch(pokemonProvider);
 
 pokemonAsync.when(
@@ -129,7 +183,86 @@ pokemonAsync.when(
   loading: () => CircularProgressIndicator(),
   error: (e, _) => Text('Error'),
 );
+```
 
+### Regla clave de UI
+> La UI solo decide **qué mostrar**,  
+> nunca **cómo obtener los datos**.
 
+---
 
+## 🧠 Conexión entre capas
 
+| Capa | Responsabilidad |
+|-----|----------------|
+| UI | Renderizar datos |
+| Riverpod | Gestionar estado y dependencias |
+| Dio | Comunicación con API |
+| Freezed | Modelado seguro de datos |
+
+### Regla de oro del proyecto
+> La UI no sabe de HTTP  
+> HTTP no sabe de Widgets  
+> El estado vive fuera del Widget  
+
+---
+
+## 📱 Funcionalidades actuales
+
+- Listado paginado de Pokémon
+- Visualización de nombre, ID y sprite
+- Manejo de estados: loading / error / success
+- Base lista para pantalla de detalle
+
+---
+
+## 🔄 Proyectos donde este stack es reutilizable
+
+Este mismo enfoque aplica directamente a:
+
+- 📦 Catálogo de productos
+- 🛒 Ecommerce
+- 📇 CRM simple
+- ☁️ App de clima
+- 💱 Cotizaciones financieras
+- 🏢 Apps internas empresariales
+
+Cambian las APIs, **no la arquitectura**.
+
+---
+
+## 🚨 Errores comunes a evitar
+
+❌ Llamar Dio desde widgets  
+❌ Manejar JSON manualmente  
+❌ Usar `setState` para datos remotos  
+❌ Mezclar lógica de negocio con UI  
+❌ No documentar el proyecto  
+
+---
+
+## 🧩 Conclusión de aprendizaje
+
+Este proyecto sirve como:
+- Guía de arquitectura Flutter
+- Ejemplo real de consumo de APIs
+- Base para proyectos más grandes
+- Referencia futura reutilizable
+
+Entender este flujo completo significa haber superado la etapa inicial en Flutter.
+
+---
+
+## 📌 Próximos pasos
+
+- Pantalla de detalle de Pokémon
+- Navegación a detalle
+- Infinite scroll
+- Manejo de errores avanzado
+- Tests básicos
+
+---
+
+## 📄 Licencia
+
+Proyecto de uso educativo.
