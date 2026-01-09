@@ -1,48 +1,71 @@
 # Flutter Pokedex App 🐱‍👤
 
-Aplicación móvil desarrollada en **Flutter** con fines **educativos**, que consume datos de la **PokeAPI** para mostrar una lista de Pokémon y, progresivamente, su detalle.
+Aplicación móvil desarrollada en **Flutter** con fines **educativos**, que consume datos de la **PokeAPI** para mostrar un listado de Pokémon y, progresivamente, su detalle.
 
-Este proyecto está diseñado como una **guía de aprendizaje real**, aplicando buenas prácticas usadas en proyectos profesionales Flutter, sin sobreingeniería.
+Este proyecto está pensado como una **base de aprendizaje real**, utilizando herramientas y patrones comunes en proyectos profesionales Flutter, priorizando claridad, separación de responsabilidades y comprensión del flujo completo.
 
 ---
 
-## 📌 Objetivo del proyecto
+## 🎯 Objetivo del proyecto
 
 - Aprender a consumir APIs REST en Flutter
-- Comprender el manejo de estado con Riverpod
+- Entender cómo estructurar una app real desde cero
 - Modelar datos JSON de forma segura
-- Separar responsabilidades usando arquitectura por capas
-- Construir una base reutilizable para otros proyectos
+- Manejar estado asincrónico correctamente
+- Separar UI, lógica y datos
+- Crear una base reutilizable para otros proyectos
 
 ---
 
-## 🚀 Tecnologías utilizadas
+## 🌐 Fuente de datos – PokeAPI
 
-### 🧩 Flutter
-Framework principal para el desarrollo de aplicaciones móviles multiplataforma.
-
----
-
-### 🌐 PokeAPI
 API pública utilizada para obtener información de Pokémon.
 
-- Listado paginado de Pokémon
+- Listado paginado
 - Detalle por nombre o ID
 - Sprites oficiales
 
-Documentación: https://pokeapi.co/
+📎 Documentación: https://pokeapi.co/
 
 ---
 
-## 📡 Dio – Cliente HTTP
+## 🧱 Arquitectura general del proyecto
+
+El proyecto sigue una **arquitectura por capas**, inspirada en Clean Architecture, adaptada a un contexto educativo.
+
+lib/
+├── core/
+│ ├── constants/ # Configuraciones globales (URLs, etc.)
+│ └── network/ # Cliente HTTP (Dio)
+│
+├── features/
+│ └── pokemon/
+│ ├── data/ # Modelos, API, repositorios
+│ ├── domain/ # Contratos / abstracciones
+│ └── presentation/
+│ ├── providers/ # Riverpod (estado y dependencias)
+│ ├── screens/ # Pantallas
+│ └── widgets/ # Widgets reutilizables
+
+
+
+### ¿Por qué esta arquitectura?
+- La UI no conoce detalles de red
+- La lógica no depende de widgets
+- El código escala sin volverse caótico
+- Facilita testing y mantenimiento
+
+---
+
+## 📡 Dio – Capa de red (HTTP)
 
 `dio` es el cliente HTTP utilizado para comunicarse con la API.
 
-### ¿Por qué Dio?
-- Manejo avanzado de requests y responses
-- Timeouts configurables
-- Interceptors (logs, headers, auth)
-- Mejor control de errores que `http`
+### Responsabilidad de Dio en el proyecto
+- Realizar requests HTTP
+- Manejar parámetros, headers y timeouts
+- Centralizar configuración de red
+- Evitar lógica de red en la UI
 
 ### Ejemplo de uso
 ```dart
@@ -53,3 +76,60 @@ final response = await dio.get(
     'offset': 0,
   },
 );
+
+
+@freezed
+class PokemonListItem with _$PokemonListItem {
+  const factory PokemonListItem({
+    required String name,
+    required String url,
+  }) = _PokemonListItem;
+
+  factory PokemonListItem.fromJson(Map<String, dynamic> json) =>
+      _$PokemonListItemFromJson(json);
+}
+
+
+final pokemon = PokemonListItem.fromJson(json);
+print(pokemon.name);
+
+🛠️ Generación de código
+
+Cada vez que se crea o modifica un modelo:
+
+dart run build_runner build --delete-conflicting-outputs
+
+
+Esto genera automáticamente los archivos:
+
+*.freezed.dart
+
+*.g.dart
+
+### Provider de dependencia
+final dioProvider = Provider<Dio>((ref) => createDio());
+
+Provider asincrónico (estado)
+final pokemonProvider = FutureProvider<List<PokemonListItem>>((ref) async {
+  final api = ref.watch(pokemonApiProvider);
+  return api.fetchPokemon();
+});
+
+
+🎨 UI – Uso del estado en widgets
+
+La UI no contiene lógica de negocio.
+Solo observa el estado y renderiza.
+
+Ejemplo de uso en pantalla
+final pokemonAsync = ref.watch(pokemonProvider);
+
+pokemonAsync.when(
+  data: (data) => ListView(...),
+  loading: () => CircularProgressIndicator(),
+  error: (e, _) => Text('Error'),
+);
+
+
+
+
